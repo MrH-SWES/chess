@@ -283,7 +283,7 @@
                 });
             });
             updateStatus();
-            if(!isSetupMode) updateCaptured(); // Don't update captured in setup (it breaks)
+            if(!isSetupMode) updateCaptured(); 
         }
 
         // --- Interaction Logic ---
@@ -357,20 +357,7 @@
 
             // If a piece is selected, try to move it to the new square
             if (selectedSquare) {
-                // FORCE TURN: Ensure engine allows the move by temporarily swapping turn if needed
-                const selectedPiece = game.get(selectedSquare);
-                const currentTurn = game.turn();
-                
-                // If it's not the selected piece's turn, we force the FEN to make it their turn
-                if (selectedPiece.color !== currentTurn) {
-                    let fen = game.fen();
-                    const parts = fen.split(' ');
-                    parts[1] = selectedPiece.color; // Force active color
-                    parts[3] = '-'; // Clear en passant to avoid errors in manual manipulation
-                    game.load(parts.join(' '));
-                }
-
-                // Attempt Move
+                // NOTE: We rely on the state we set during selection (below)
                 const move = game.move({
                     from: selectedSquare,
                     to: square,
@@ -379,8 +366,6 @@
 
                 if (move) {
                     selectedSquare = null;
-                    // Note: We do NOT add to historyStack in setup mode to avoid corrupting undo/redo
-                    // But we DO re-render
                     createBoard();
                     return;
                 }
@@ -390,14 +375,16 @@
             if (piece) {
                 selectedSquare = square;
                 
-                // Force engine turn to this piece so game.moves() returns valid data
-                if (piece.color !== game.turn()) {
-                    let fen = game.fen();
-                    const parts = fen.split(' ');
-                    parts[1] = piece.color;
-                    parts[3] = '-';
-                    game.load(parts.join(' '));
-                }
+                // FORCE STATE:
+                // 1. Make it this piece's turn
+                // 2. ENABLE CASTLING (KQkq) so demo works even if King moved previously
+                // 3. Clear En Passant to be safe
+                let fen = game.fen();
+                const parts = fen.split(' ');
+                parts[1] = piece.color; // Force Active Color
+                parts[2] = 'KQkq';      // Force Castling Availability
+                parts[3] = '-';         // Clear EP
+                game.load(parts.join(' '));
                 
                 renderHighlights();
             } else {
@@ -416,8 +403,7 @@
             const selectedEl = document.querySelector(`[data-square="${selectedSquare}"]`);
             if (selectedEl) selectedEl.classList.add('selected');
 
-            // game.moves() relies on whose turn it is. 
-            // In setup 'cursor' mode, we have already forced the turn to the selected piece in handleSetupClick
+            // game.moves() relies on the internal state we forced in handleSetupClick
             const moves = game.moves({ square: selectedSquare, verbose: true });
             moves.forEach(move => {
                 const targetEl = document.querySelector(`[data-square="${move.to}"]`);
@@ -477,7 +463,6 @@
                 turnText.style.background = "#555";
                 turnText.style.color = "#fff";
                 
-                // Disable Back/Fwd during setup because we are breaking the timeline
                 document.getElementById('btn-back').disabled = true;
                 document.getElementById('btn-fwd').disabled = true;
                 
@@ -503,7 +488,6 @@
 
         // --- Setup / Palette Logic ---
         function initPalette() {
-            // Added 'cursor' as the first tool
             const pieces = ['cursor', 'sep', 'wP', 'wN', 'wB', 'wR', 'wQ', 'wK', 'sep', 'bP', 'bN', 'bB', 'bR', 'bQ', 'bK', 'sep', 'trash'];
             paletteEl.innerHTML = '';
             
@@ -595,15 +579,13 @@
                 palette.style.display = 'flex';
                 btn.textContent = "Done";
                 setupTool = 'cursor'; // Default to free move
-                initPalette(); // Re-render palette to ensure highlight
-                // Clear captured because we are about to break the timeline
+                initPalette(); 
                 capW.innerHTML = '';
                 capB.innerHTML = '';
             } else {
                 btn.classList.remove('active-mode');
                 palette.style.display = 'none';
                 btn.textContent = "🛠 Setup";
-                // When finishing setup, we establish a new timeline
                 historyStack = [game.fen()];
                 currentHistoryIndex = 0;
             }
