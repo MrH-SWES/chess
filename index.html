@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classroom Chess Pro</title>
+    <title>Classroom Chess: Sandbox Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <style>
         :root {
             --light-square: #f0d9b5;
             --dark-square: #b58863;
-            --highlight: rgba(100, 210, 100, 0.7); /* Green - Moves */
-            --capture: rgba(200, 50, 50, 0.6);     /* Red - Captures */
-            --last-move: rgba(255, 255, 50, 0.5);  /* Yellow - Last Move */
-            --selected: rgba(100, 100, 255, 0.5);  /* Blue - Selection */
+            --highlight: rgba(100, 210, 100, 0.7);
+            --capture: rgba(200, 50, 50, 0.6);
+            --last-move: rgba(255, 255, 50, 0.5);
+            --selected: rgba(100, 100, 255, 0.5);
             --bg-color: #2c2c2c;
             --text-color: #f0f0f0;
+            --panel-bg: rgba(0,0,0,0.3);
         }
 
         body {
@@ -27,27 +28,31 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            overflow: hidden;
             user-select: none;
         }
 
         #ui-container {
-            width: 95vmin;
-            max-width: 650px;
+            width: 98vw;
+            height: 95vh;
+            max-width: 1200px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
+            align-items: center;
         }
 
         /* Top Bar */
         #status-bar {
+            width: 100%;
+            max-width: 600px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 8px 15px;
-            background: rgba(0,0,0,0.3);
+            background: var(--panel-bg);
             border-radius: 8px;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
+            box-sizing: border-box;
         }
 
         #turn-indicator span {
@@ -57,22 +62,53 @@
             margin-left: 5px;
         }
 
+        /* Middle Section: Captures + Board */
+        #game-area {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex: 1;
+            width: 100%;
+        }
+
         /* The Board */
         #board {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
-            width: 100%;
-            aspect-ratio: 1 / 1;
+            height: min(70vh, 70vw); 
+            width: min(70vh, 70vw);
             border: 4px solid #444;
             box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        /* Captured Pieces Sidebars */
+        .captured-column {
+            display: flex;
+            flex-direction: column;
+            width: 60px;
+            height: min(70vh, 70vw);
+            background: var(--panel-bg);
+            border-radius: 8px;
+            padding: 10px 5px;
+            align-items: center;
+            gap: 5px;
+            overflow-y: auto;
+        }
+        
+        .captured-piece {
+            font-size: 2.2rem;
+            line-height: 1;
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
         }
 
         .square {
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 3.5rem; /* Big pieces */
+            font-size: clamp(1rem, 8vmin, 4rem);
             cursor: pointer;
             position: relative;
         }
@@ -80,7 +116,6 @@
         .light { background-color: var(--light-square); color: black; }
         .dark { background-color: var(--dark-square); color: black; }
         
-        /* Piece Colors */
         .piece.white { color: #fff; text-shadow: 0 0 2px #000; z-index: 2; }
         .piece.black { color: #000; text-shadow: 0 0 1px #fff; z-index: 2; }
 
@@ -94,21 +129,16 @@
         .selected { background-color: var(--selected) !important; }
         .last-move { box-shadow: inset 0 0 0 4px var(--last-move); }
 
-        /* Coordinates (a-h, 1-8) */
+        /* Coordinates */
         .coord {
-            position: absolute;
-            font-size: 0.8rem;
-            font-weight: bold;
-            color: inherit;
-            pointer-events: none;
-            opacity: 0.7;
+            position: absolute; font-size: 0.8rem; font-weight: bold;
+            color: inherit; pointer-events: none; opacity: 0.7;
         }
         .coord-rank { top: 2px; left: 4px; }
         .coord-file { bottom: 2px; right: 4px; }
 
-        /* Controls Area */
-        #controls { display: flex; gap: 8px; height: 50px; }
-        
+        /* Controls */
+        #controls { display: flex; gap: 8px; height: 50px; width: 100%; max-width: 600px; }
         button {
             flex: 1; font-size: 1rem; border: none; border-radius: 5px;
             cursor: pointer; background-color: #555; color: white;
@@ -119,20 +149,14 @@
         button:disabled { opacity: 0.3; cursor: not-allowed; }
         button.active-mode { background-color: #d64541; color: white; font-weight: bold; }
 
-        /* Setup Palette (Hidden by default) */
+        /* Setup Palette */
         #setup-palette {
-            display: none; /* Flex when active */
-            flex-wrap: wrap;
-            gap: 5px;
-            background: #333;
-            padding: 10px;
-            border-radius: 8px;
-            justify-content: center;
+            display: none; flex-wrap: wrap; gap: 5px; background: #333;
+            padding: 10px; border-radius: 8px; justify-content: center;
+            width: 100%; max-width: 600px;
         }
-        
         .palette-piece {
-            width: 40px; height: 40px;
-            font-size: 1.8rem;
+            width: 40px; height: 40px; font-size: 1.8rem;
             display: flex; justify-content: center; align-items: center;
             background: #444; border-radius: 4px; cursor: pointer;
             border: 2px solid transparent;
@@ -140,6 +164,11 @@
         .palette-piece.selected-tool { border-color: #fff; background: #666; }
         .palette-sep { width: 2px; background: #666; margin: 0 5px; }
 
+        @media (max-width: 800px) {
+            #game-area { flex-direction: column; }
+            .captured-column { flex-direction: row; width: 100%; height: 50px; max-width: 600px; }
+            #board { height: 90vw; width: 90vw; }
+        }
     </style>
 </head>
 <body>
@@ -151,7 +180,11 @@
             <div id="game-status"></div>
         </div>
 
-        <div id="board"></div>
+        <div id="game-area">
+            <div id="captured-white" class="captured-column"></div>
+            <div id="board"></div>
+            <div id="captured-black" class="captured-column"></div>
+        </div>
 
         <div id="setup-palette">
             </div>
@@ -171,42 +204,34 @@
         let historyStack = [game.fen()];
         let currentHistoryIndex = 0;
         let selectedSquare = null;
-        let orientation = 'white'; // 'white' or 'black'
+        let orientation = 'white'; 
         let isSetupMode = false;
-        let setupTool = 'wP'; // Default tool: White Pawn
+        let setupTool = 'cursor'; // Default to "Free Move" in setup
 
-        // Unicode Pieces
         const pieceIcons = {
             'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
             'P': '♟', 'R': '♜', 'N': '♞', 'B': '♝', 'Q': '♛', 'K': '♚'
         };
 
-        // --- DOM Elements ---
         const boardEl = document.getElementById('board');
         const turnText = document.getElementById('turn-text');
         const statusText = document.getElementById('game-status');
         const paletteEl = document.getElementById('setup-palette');
+        const capWhiteEl = document.getElementById('captured-white');
+        const capBlackEl = document.getElementById('captured-black');
 
         // --- Core Rendering ---
         function createBoard() {
             boardEl.innerHTML = '';
-            const boardState = game.board(); // 8x8 array: [0][0] is a8
+            const boardState = game.board();
             
-            // Determine loop order based on orientation
             const rows = orientation === 'white' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
             const cols = orientation === 'white' ? [0,1,2,3,4,5,6,7] : [7,6,5,4,3,2,1,0];
 
-            // Get last move for highlighting
             let lastMove = null;
-            if (currentHistoryIndex > 0) {
-                // To get the last move, we need to peek at history logic or store it
-                // We'll calculate it by comparing FENs or checking game history
-                const tempGame = new Chess();
-                // Load the history state up to current index
-                // A simpler way: use game.history if we are at the "head", 
-                // but since we scrub history, we might just store the move object in historyStack?
-                // Simpler: Just rely on game.history() if we are synchronized.
-                // For simplicity in this "dirty" script: calculate from game object if synchronized
+            if (currentHistoryIndex > 0 && !isSetupMode) {
+                // We rely on internal game state history for highlights in normal play
+                // In Setup mode, history is often wiped, so we skip this
                 const history = game.history({ verbose: true });
                 if (history.length > 0) {
                     lastMove = history[history.length - 1];
@@ -217,19 +242,17 @@
                 cols.forEach(col => {
                     const squareDiv = document.createElement('div');
                     const isDark = (row + col) % 2 === 1;
-                    const fileChar = String.fromCharCode(97 + col); // 'a'...'h'
-                    const rankChar = String.fromCharCode(56 - row); // '8'...'1'
+                    const fileChar = String.fromCharCode(97 + col);
+                    const rankChar = String.fromCharCode(56 - row);
                     const squareName = fileChar + rankChar;
                     
                     squareDiv.className = `square ${isDark ? 'dark' : 'light'}`;
                     squareDiv.dataset.square = squareName;
 
-                    // Last Move Highlight
                     if (lastMove && (squareName === lastMove.from || squareName === lastMove.to)) {
                         squareDiv.classList.add('last-move');
                     }
 
-                    // Render Piece
                     const piece = boardState[row][col];
                     if (piece) {
                         const span = document.createElement('span');
@@ -238,10 +261,7 @@
                         squareDiv.appendChild(span);
                     }
 
-                    // Render Coordinates (On edges)
-                    // Rank (Numbers): Left side (col 0) if White, Right side (col 7) if Black? 
-                    // Standard: Numbers usually on Left (a-file)
-                    // Let's put Numbers on the absolute Leftmost squares of the visual grid
+                    // Coordinates
                     const isLeftEdge = (orientation === 'white' && col === 0) || (orientation === 'black' && col === 7);
                     const isBottomEdge = (orientation === 'white' && row === 7) || (orientation === 'black' && row === 0);
 
@@ -263,29 +283,29 @@
                 });
             });
             updateStatus();
+            if(!isSetupMode) updateCaptured(); // Don't update captured in setup (it breaks)
         }
 
         // --- Interaction Logic ---
-
         function handleSquareClick(square) {
             if (isSetupMode) {
                 handleSetupClick(square);
-                return;
+            } else {
+                handlePlayClick(square);
             }
+        }
 
-            // Play Mode logic
-            if (currentHistoryIndex !== historyStack.length - 1) return; // Prevent move if viewing history
+        function handlePlayClick(square) {
+            if (currentHistoryIndex !== historyStack.length - 1) return;
 
             const piece = game.get(square);
 
-            // 1. Unselect if clicking same square
             if (selectedSquare === square) {
                 selectedSquare = null;
                 renderHighlights();
                 return;
             }
 
-            // 2. Move Piece
             if (selectedSquare) {
                 const move = game.move({
                     from: selectedSquare,
@@ -301,7 +321,6 @@
                 }
             }
 
-            // 3. Select Piece
             if (piece && piece.color === game.turn()) {
                 selectedSquare = square;
                 renderHighlights();
@@ -312,16 +331,79 @@
         }
 
         function handleSetupClick(square) {
-            if (setupTool === 'trash') {
-                game.remove(square);
-            } else {
-                // Tool format: 'wP' (color + type)
-                const color = setupTool[0];
-                const type = setupTool[1].toLowerCase();
-                game.remove(square); // Remove existing
-                game.put({ type: type, color: color }, square);
+            // 1. Paint/Trash Logic
+            if (setupTool !== 'cursor') {
+                if (setupTool === 'trash') {
+                    game.remove(square);
+                } else {
+                    const color = setupTool[0];
+                    const type = setupTool[1].toLowerCase();
+                    game.remove(square);
+                    game.put({ type: type, color: color }, square);
+                }
+                createBoard();
+                return;
             }
-            createBoard();
+
+            // 2. "Cursor" (Free Move) Logic
+            const piece = game.get(square);
+
+            // If clicking the same square, deselect
+            if (selectedSquare === square) {
+                selectedSquare = null;
+                renderHighlights();
+                return;
+            }
+
+            // If a piece is selected, try to move it to the new square
+            if (selectedSquare) {
+                // FORCE TURN: Ensure engine allows the move by temporarily swapping turn if needed
+                const selectedPiece = game.get(selectedSquare);
+                const currentTurn = game.turn();
+                
+                // If it's not the selected piece's turn, we force the FEN to make it their turn
+                if (selectedPiece.color !== currentTurn) {
+                    let fen = game.fen();
+                    const parts = fen.split(' ');
+                    parts[1] = selectedPiece.color; // Force active color
+                    parts[3] = '-'; // Clear en passant to avoid errors in manual manipulation
+                    game.load(parts.join(' '));
+                }
+
+                // Attempt Move
+                const move = game.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q'
+                });
+
+                if (move) {
+                    selectedSquare = null;
+                    // Note: We do NOT add to historyStack in setup mode to avoid corrupting undo/redo
+                    // But we DO re-render
+                    createBoard();
+                    return;
+                }
+            }
+
+            // Select a piece (Allow selecting EITHER color)
+            if (piece) {
+                selectedSquare = square;
+                
+                // Force engine turn to this piece so game.moves() returns valid data
+                if (piece.color !== game.turn()) {
+                    let fen = game.fen();
+                    const parts = fen.split(' ');
+                    parts[1] = piece.color;
+                    parts[3] = '-';
+                    game.load(parts.join(' '));
+                }
+                
+                renderHighlights();
+            } else {
+                selectedSquare = null;
+                renderHighlights();
+            }
         }
 
         function renderHighlights() {
@@ -331,11 +413,11 @@
 
             if (!selectedSquare) return;
 
-            // Highlight Origin
             const selectedEl = document.querySelector(`[data-square="${selectedSquare}"]`);
             if (selectedEl) selectedEl.classList.add('selected');
 
-            // Highlight Destiniations
+            // game.moves() relies on whose turn it is. 
+            // In setup 'cursor' mode, we have already forced the turn to the selected piece in handleSetupClick
             const moves = game.moves({ square: selectedSquare, verbose: true });
             moves.forEach(move => {
                 const targetEl = document.querySelector(`[data-square="${move.to}"]`);
@@ -345,10 +427,39 @@
             });
         }
 
-        // --- History & Game State ---
+        // --- Captured Pieces Logic ---
+        function updateCaptured() {
+            const history = game.history({ verbose: true });
+            const capturedW = []; 
+            const capturedB = []; 
+            const values = { 'q': 9, 'r': 5, 'b': 3, 'n': 3, 'p': 1 };
 
+            history.forEach(move => {
+                if (move.captured) {
+                    if (move.color === 'w') capturedB.push(move.captured);
+                    else capturedW.push(move.captured);
+                }
+            });
+
+            capturedW.sort((a,b) => values[b] - values[a]);
+            capturedB.sort((a,b) => values[b] - values[a]);
+
+            renderCapturedContainer(capWhiteEl, capturedW, 'white');
+            renderCapturedContainer(capBlackEl, capturedB, 'black');
+        }
+
+        function renderCapturedContainer(container, pieces, colorClass) {
+            container.innerHTML = '';
+            pieces.forEach(p => {
+                const span = document.createElement('span');
+                span.className = `captured-piece piece ${colorClass}`;
+                span.textContent = pieceIcons[p];
+                container.appendChild(span);
+            });
+        }
+
+        // --- History & Game State ---
         function addToHistory() {
-            // Cut off future if we were in past
             if (currentHistoryIndex < historyStack.length - 1) {
                 historyStack = historyStack.slice(0, currentHistoryIndex + 1);
             }
@@ -358,34 +469,42 @@
         }
 
         function updateStatus() {
-            // Turn
-            const turn = game.turn() === 'w' ? 'White' : 'Black';
-            turnText.textContent = turn;
-            turnText.style.background = turn === 'White' ? '#fff' : '#333';
-            turnText.style.color = turn === 'White' ? '#000' : '#fff';
-
-            // Status
             if (isSetupMode) {
-                statusText.textContent = "SETUP MODE";
+                // Setup Mode Status
+                statusText.textContent = "SETUP / FREE MOVE";
                 statusText.style.color = "#d64541";
+                turnText.textContent = "-";
+                turnText.style.background = "#555";
+                turnText.style.color = "#fff";
+                
+                // Disable Back/Fwd during setup because we are breaking the timeline
+                document.getElementById('btn-back').disabled = true;
+                document.getElementById('btn-fwd').disabled = true;
+                
             } else {
+                // Normal Play Status
+                const turn = game.turn() === 'w' ? 'White' : 'Black';
+                turnText.textContent = turn;
+                turnText.style.background = turn === 'White' ? '#fff' : '#333';
+                turnText.style.color = turn === 'White' ? '#000' : '#fff';
+
                 statusText.style.color = "#ccc";
                 if (game.in_checkmate()) statusText.textContent = "Checkmate!";
                 else if (game.in_draw()) statusText.textContent = "Draw!";
                 else if (game.in_check()) statusText.textContent = "Check!";
                 else statusText.textContent = "";
-            }
 
-            // Buttons
-            document.getElementById('btn-back').disabled = currentHistoryIndex === 0 || isSetupMode;
-            document.getElementById('btn-fwd').disabled = currentHistoryIndex === historyStack.length - 1 || isSetupMode;
+                document.getElementById('btn-back').disabled = currentHistoryIndex === 0;
+                document.getElementById('btn-fwd').disabled = currentHistoryIndex === historyStack.length - 1;
+            }
+            
             document.getElementById('btn-flip').textContent = orientation === 'white' ? 'Flip ⟳' : 'Flip ⟲';
         }
 
         // --- Setup / Palette Logic ---
-        
         function initPalette() {
-            const pieces = ['wP', 'wN', 'wB', 'wR', 'wQ', 'wK', 'sep', 'bP', 'bN', 'bB', 'bR', 'bQ', 'bK', 'sep', 'trash'];
+            // Added 'cursor' as the first tool
+            const pieces = ['cursor', 'sep', 'wP', 'wN', 'wB', 'wR', 'wQ', 'wK', 'sep', 'bP', 'bN', 'bB', 'bR', 'bQ', 'bK', 'sep', 'trash'];
             paletteEl.innerHTML = '';
             
             pieces.forEach(p => {
@@ -395,11 +514,13 @@
                     paletteEl.appendChild(sep);
                     return;
                 }
-
                 const div = document.createElement('div');
                 div.className = 'palette-piece';
                 
-                if (p === 'trash') {
+                if (p === 'cursor') {
+                    div.innerHTML = '👆'; // Cursor Icon
+                    div.title = "Free Move Mode";
+                } else if (p === 'trash') {
                     div.innerHTML = '🗑️';
                 } else {
                     const color = p[0] === 'w' ? 'white' : 'black';
@@ -412,12 +533,11 @@
                     document.querySelectorAll('.palette-piece').forEach(el => el.classList.remove('selected-tool'));
                     div.classList.add('selected-tool');
                 });
-
+                
                 if (p === setupTool) div.classList.add('selected-tool');
                 paletteEl.appendChild(div);
             });
             
-            // Add Clear Board Button
             const clearBtn = document.createElement('button');
             clearBtn.textContent = "Clear All";
             clearBtn.style.width = "100%";
@@ -428,7 +548,6 @@
         }
 
         // --- Event Listeners ---
-
         document.getElementById('btn-back').addEventListener('click', () => {
             if (currentHistoryIndex > 0) {
                 currentHistoryIndex--;
@@ -468,25 +587,31 @@
             isSetupMode = !isSetupMode;
             const btn = document.getElementById('btn-setup');
             const palette = document.getElementById('setup-palette');
+            const capW = document.getElementById('captured-white');
+            const capB = document.getElementById('captured-black');
             
             if (isSetupMode) {
                 btn.classList.add('active-mode');
                 palette.style.display = 'flex';
                 btn.textContent = "Done";
-                selectedSquare = null;
-                renderHighlights(); // clear highlights
+                setupTool = 'cursor'; // Default to free move
+                initPalette(); // Re-render palette to ensure highlight
+                // Clear captured because we are about to break the timeline
+                capW.innerHTML = '';
+                capB.innerHTML = '';
             } else {
                 btn.classList.remove('active-mode');
                 palette.style.display = 'none';
                 btn.textContent = "🛠 Setup";
-                // Reset history stack to this new reality
+                // When finishing setup, we establish a new timeline
                 historyStack = [game.fen()];
                 currentHistoryIndex = 0;
             }
+            selectedSquare = null;
+            renderHighlights();
             updateStatus();
         });
 
-        // Init
         initPalette();
         createBoard();
 
